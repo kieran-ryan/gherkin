@@ -3,7 +3,7 @@ name: test-codegen
 on:
   push:
     branches:
-      - main
+      - dep/berp-1.5
       - renovate/**
   pull_request:
     branches:
