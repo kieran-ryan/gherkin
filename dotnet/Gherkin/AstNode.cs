@@ -1,65 +1,96 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+namespace Gherkin;
 
-namespace Gherkin
+public class AstNode(RuleType ruleType)
 {
-    public class AstNode
+    private readonly Dictionary<RuleType, object> subItems = new Dictionary<RuleType, object>();
+
+    public RuleType RuleType { get; } = ruleType;
+
+    public Token GetToken(TokenType tokenType)
     {
-        private readonly Dictionary<RuleType, IList<object>> subItems = new Dictionary<RuleType, IList<object>>();
-        public RuleType RuleType { get; private set; }
+        return GetSingle<Token>((RuleType)tokenType);
+    }
 
-        public AstNode(RuleType ruleType)
-        {
-            this.RuleType = ruleType;
-        }
+    public IEnumerable<Token> GetTokens(TokenType tokenType)
+    {
+        return GetItems<Token>((RuleType)tokenType);
+    }
 
-        public Token GetToken(TokenType tokenType)
+    public T GetSingle<T>(RuleType ruleType)
+    {
+        if (!subItems.TryGetValue(ruleType, out var items))
+            return default;
+        if (items is List<object> list)
         {
-            return GetSingle<Token>((RuleType)tokenType);
-        }
-
-        public IEnumerable<Token> GetTokens(TokenType tokenType)
-        {
-            return GetItems<Token>((RuleType)tokenType);
-        }
-
-        public T GetSingle<T>(RuleType ruleType)
-        {
-            return GetItems<T>(ruleType).SingleOrDefault();
-        }
-
-        public IEnumerable<T> GetItems<T>(RuleType ruleType)
-        {
-            IList<object> items;
-            if (!subItems.TryGetValue(ruleType, out items))
+            T ret = default;
+            bool foundOne = false;
+            foreach (var item in list)
             {
-                return Enumerable.Empty<T>();
+                if (item is T tItem)
+                {
+                    if (foundOne)
+                        throw new InvalidOperationException();
+                    ret = tItem;
+                    foundOne = true;
+                }
             }
-            return items.Cast<T>();
+            if (foundOne)
+                return ret;
+            else
+                throw new InvalidOperationException();
         }
-
-        public void SetSingle<T>(RuleType ruleType, T value)
+        else if (items is T tItem)
         {
-            subItems[ruleType] = new object[] { value };
+            return tItem;
         }
+        return default;
+    }
 
-        public void AddRange<T>(RuleType ruleType, IEnumerable<T> values)
+    public IEnumerable<T> GetItems<T>(RuleType ruleType)
+    {
+        if (!subItems.TryGetValue(ruleType, out var items))
+            yield break;
+        if (items is List<object> list)
         {
-            foreach (var value in values)
+            foreach (var item in list)
             {
-                Add(ruleType, value);
+                if (item is T tItem)
+                    yield return tItem;
             }
         }
-
-        public void Add<T>(RuleType ruleType, T obj)
+        else if (items is T tItem)
         {
-            IList<object> items;
-            if (!subItems.TryGetValue(ruleType, out items))
-            {
-                items = new List<object>();
-                subItems.Add(ruleType, items);
-            }
-            items.Add(obj);
+            yield return tItem;
+        }
+    }
+
+    public void SetSingle<T>(RuleType ruleType, T value)
+    {
+        subItems[ruleType] = new object[] { value };
+    }
+
+    public void AddRange<T>(RuleType ruleType, IEnumerable<T> values)
+    {
+        foreach (var value in values)
+        {
+            Add(ruleType, value);
+        }
+    }
+
+    public void Add<T>(RuleType ruleType, T obj)
+    {
+        if (!subItems.TryGetValue(ruleType, out var items))
+        {
+            subItems.Add(ruleType, obj);
+        }
+        else if (items is List<object> list)
+        {
+            list.Add(obj);
+        }
+        else
+        {
+            list = [items, obj];
+            subItems[ruleType] = list;
         }
     }
 }
